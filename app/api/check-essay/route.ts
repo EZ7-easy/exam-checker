@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY!,
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req: Request) {
@@ -17,13 +17,25 @@ export async function POST(req: Request) {
         }
 
         const prompt = `
-You are an IELTS examiner. Analyze the following essay and respond ONLY with valid JSON in this exact format:
+You are an IELTS examiner.
+Analyze the essay and give the scores out of 9 for each of the following:
+1. Coherence
+2. Cohesion
+3. Lexical Resource
+4. Grammatical Range and Accuracy
+
+Return ONLY valid JSON with this structure:
 {
-  "coherence": "...",
-  "cohesion": "...",
-  "lexicalResource": "...",
-  "grammar": "..."
+  "scores": {
+    "coherence": { "score": number },
+    "cohesion": { "score": number},
+    "lexicalResource": { "score": number,  },
+    "grammar": { "score": number }
+  },
+  "overallScore": number,
 }
+
+Do not include any extra text or formatting outside of the JSON.
 
 Essay:
 ${essay}
@@ -32,14 +44,19 @@ ${essay}
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
-                { role: "system", content: "You are an expert IELTS writing examiner." },
+                {
+                    role: "system",
+                    content: "You are an expert IELTS writing examiner. Output JSON only.",
+                },
                 { role: "user", content: prompt },
             ],
             temperature: 0.4,
+            response_format: { type: "json_object" }, // Forces valid JSON
         });
 
-        const raw = response.choices[0].message?.content || "{}";
-        const analysis = JSON.parse(raw);
+        const analysis = JSON.parse(
+            response.choices[0].message?.content || "{}"
+        );
 
         return NextResponse.json(analysis);
     } catch (error: any) {
